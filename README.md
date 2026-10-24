@@ -235,7 +235,7 @@ SQL:     bloodbank_sql
 MongoDB: bloodbank_nosql
 ```
 
-Create the databases locally and run the project's schema/seed scripts when they are available.
+The SQL schema, fictional seed data, and example queries are available in the [database directory](database/README.md). The current scripts target MySQL 8.0.19+. MongoDB setup and the application services remain planned work.
 
 ### Environment Variables
 
@@ -287,7 +287,7 @@ dropsync/
 └── README.md       # Project documentation
 ```
 
-> **Repository status:** the repository currently contains the README/documentation. Implementation folders and scripts will be added as development progresses.
+> **Repository status:** SQL schema, seed data, and query examples are implemented under `database/`. Backend, frontend, and MongoDB integration remain planned.
 
 ## 🔮 Future Scope
 
