@@ -1,4 +1,4 @@
-const db = require('../config/db');
+const db = require("../config/db");
 
 /**
  * Health check endpoint: checks server and database readiness
@@ -7,20 +7,20 @@ async function getHealth(req, res) {
   const dbStatus = await db.testConnection();
 
   const healthData = {
-    status: dbStatus.connected ? 'healthy' : 'degraded',
+    status: dbStatus.connected ? "healthy" : "degraded",
     uptime: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
     services: {
       api: {
-        status: 'up'
+        status: "up",
       },
       database: {
-        engine: 'MySQL (8.0.19+ InnoDB)',
-        status: dbStatus.connected ? 'connected' : 'disconnected',
+        engine: "MySQL (8.0.19+ InnoDB)",
+        status: dbStatus.connected ? "connected" : "disconnected",
         details: dbStatus.message,
-        ...(dbStatus.serverTime && { serverTime: dbStatus.serverTime })
-      }
-    }
+        ...(dbStatus.serverTime && { serverTime: dbStatus.serverTime }),
+      },
+    },
   };
 
   const httpStatus = dbStatus.connected ? 200 : 503;
@@ -28,5 +28,5 @@ async function getHealth(req, res) {
 }
 
 module.exports = {
-  getHealth
+  getHealth,
 };

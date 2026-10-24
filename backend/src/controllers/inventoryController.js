@@ -1,4 +1,4 @@
-const db = require('../config/db');
+const db = require("../config/db");
 
 /**
  * Search blood availability by blood group and city.
@@ -13,20 +13,22 @@ async function searchInventory(req, res, next) {
   try {
     const { blood_group, city, min_units } = req.query;
 
-    const conditions = ['i.units_available >= ?'];
+    const conditions = ["i.units_available >= ?"];
     const params = [parseInt(min_units, 10) || 1];
 
     if (blood_group && blood_group.trim()) {
-      conditions.push('bg.group_code = ?');
+      conditions.push("bg.group_code = ?");
       params.push(blood_group.trim().toUpperCase());
     }
 
     if (city && city.trim()) {
-      conditions.push('LOWER(bb.city) = LOWER(?)');
+      conditions.push("LOWER(bb.city) = LOWER(?)");
       params.push(city.trim());
     }
 
-    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const whereClause = conditions.length
+      ? `WHERE ${conditions.join(" AND ")}`
+      : "";
 
     const sql = `
       SELECT
@@ -56,9 +58,9 @@ async function searchInventory(req, res, next) {
       filters: {
         blood_group: blood_group ? blood_group.trim().toUpperCase() : null,
         city: city ? city.trim() : null,
-        min_units: parseInt(min_units, 10) || 1
+        min_units: parseInt(min_units, 10) || 1,
       },
-      data: results
+      data: results,
     });
   } catch (error) {
     next(error);
@@ -73,10 +75,10 @@ async function getInventorySummary(req, res, next) {
   try {
     const { city } = req.query;
     const params = [];
-    let whereClause = '';
+    let whereClause = "";
 
     if (city && city.trim()) {
-      whereClause = 'WHERE LOWER(bb.city) = LOWER(?)';
+      whereClause = "WHERE LOWER(bb.city) = LOWER(?)";
       params.push(city.trim());
     }
 
@@ -99,7 +101,7 @@ async function getInventorySummary(req, res, next) {
     return res.status(200).json({
       success: true,
       count: summary.length,
-      data: summary
+      data: summary,
     });
   } catch (error) {
     next(error);
@@ -108,5 +110,5 @@ async function getInventorySummary(req, res, next) {
 
 module.exports = {
   searchInventory,
-  getInventorySummary
+  getInventorySummary,
 };

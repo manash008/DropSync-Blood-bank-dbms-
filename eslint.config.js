@@ -9,6 +9,12 @@ const nodeGlobals = {
   setTimeout: "readonly",
 };
 
+const commonJsGlobals = {
+  ...nodeGlobals,
+  module: "readonly",
+  require: "readonly",
+};
+
 const browserGlobals = {
   AbortController: "readonly",
   alert: "readonly",
@@ -38,6 +44,14 @@ export default [
       ecmaVersion: "latest",
       sourceType: "module",
       globals: nodeGlobals,
+    },
+  },
+  {
+    files: ["backend/src/**/*.js"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "commonjs",
+      globals: commonJsGlobals,
     },
   },
   {
