@@ -716,3 +716,193 @@ body {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* Navigation Tabs */
+.view-tabs-container {
+  background-color: #ffffff;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.view-tabs {
+  display: flex;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 8px 24px 0;
+  gap: 8px;
+}
+
+.view-tab {
+  padding: 10px 20px;
+  border: 1px solid var(--border-color);
+  border-bottom: none;
+  background-color: #f1f5f9;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  border-top-left-radius: var(--radius-sm);
+  border-top-right-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.view-tab:hover {
+  background-color: #e2e8f0;
+  color: var(--text-main);
+}
+
+.view-tab.active {
+  background-color: #ffffff;
+  color: var(--primary-color);
+  border-bottom: 2px solid #ffffff;
+  margin-bottom: -1px;
+  z-index: 10;
+}
+
+/* Hospital Requests Panel */
+.requests-section {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 24px;
+  width: 100%;
+}
+
+.request-filters {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-bottom: 24px;
+  background-color: #ffffff;
+  padding: 18px 24px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+}
+
+.requests-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 18px;
+}
+
+.request-card {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.request-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.request-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.request-hospital-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.urgency-badge {
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.urgency-critical {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #f87171;
+}
+
+.urgency-high {
+  background-color: #ffedd5;
+  color: #c2410c;
+  border: 1px solid #fb923c;
+}
+
+.urgency-normal {
+  background-color: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+
+.urgency-low {
+  background-color: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.status-pending {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.status-matched {
+  background-color: #e0f2fe;
+  color: #0369a1;
+}
+
+.status-fulfilled {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.status-cancelled {
+  background-color: #f1f5f9;
+  color: #64748b;
+}
+
+.request-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background-color: var(--bg-body);
+  border-radius: var(--radius-sm);
+}
+
+.request-blood-badge {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--primary-color);
+}
+
+.request-units {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.request-meta {
+  font-size: 13px;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}

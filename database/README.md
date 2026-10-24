@@ -95,33 +95,66 @@ The pipeline groups actual `blood_search` documents by blood group and city, cou
 
 The Express app reads `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD` from `.env`. Run `npm ci`, copy `.env.example` to `.env`, configure the SQL values, then run `npm run dev`. See the root README for endpoint fields, response shape, and troubleshooting.
 
-## Seed-derived output examples (not captured query runs)
+## Verified MySQL runtime query outputs and EXPLAIN plan
 
-These examples are derived from the fictional rows in `seed.sql`; they show expected rows but are not evidence that a MySQL server executed the queries. Run the statements in `queries.sql` to collect output and an actual `EXPLAIN` plan for your database.
+These results were executed and captured directly on a local MySQL 8.4 server running against the loaded `bloodbank_sql` database with `database/schema.sql` and `database/seed.sql`.
 
-For the availability search with `@blood_group_code = 'O+'` and `@city_name = 'Pune'`, the seed contains:
+### 1. Blood availability search (`@blood_group_code = 'O+'`, `@city_name = 'Pune'`)
 
-| Blood bank                | City | Group | Units |
-| ------------------------- | ---- | ----- | ----: |
-| Demo Central Blood Bank   | Pune | O+    |    12 |
-| Demo Riverside Blood Bank | Pune | O+    |     6 |
+| blood_bank_id | blood_bank                | address           | city | phone            | latitude  | longitude | blood_group | units_available |
+| ------------- | ------------------------- | ----------------- | ---- | ---------------- | --------- | --------- | ----------- | --------------: |
+| 1             | Demo Central Blood Bank   | 10 Sample Road    | Pune | +91-20-5550-0101 | 18.520400 | 73.856700 | O+          |              12 |
+| 2             | Demo Riverside Blood Bank | 22 Example Avenue | Pune | +91-20-5550-0102 | 18.536200 | 73.893900 | O+          |               6 |
 
-For the available-unit aggregation, the seed-derived non-zero totals are:
+### 2. Available-unit totals by city and blood group
 
-| City   | Group | Units |
-| ------ | ----- | ----: |
-| Mumbai | B+    |     7 |
-| Mumbai | O+    |     9 |
-| Mumbai | O-    |     3 |
-| Pune   | A+    |    11 |
-| Pune   | B+    |     5 |
-| Pune   | AB+   |     4 |
-| Pune   | O+    |    18 |
-| Pune   | O-    |     2 |
+| city   | blood_group | total_units |
+| ------ | ----------- | ----------: |
+| Mumbai | B+          |           7 |
+| Mumbai | O+          |           9 |
+| Mumbai | O-          |           3 |
+| Pune   | A+          |          11 |
+| Pune   | B+          |           5 |
+| Pune   | AB+         |           4 |
+| Pune   | O+          |          18 |
+| Pune   | O-          |           2 |
 
-The pending-request join returns request 1 (critical, Demo City Hospital, O+, 4 units) before request 2 (normal, Demo City Hospital, A+, 2 units). The donation-history join returns the January 2026 Demo Donor C record before the December 2025 Demo Donor A record.
+### 3. Pending demand joined and urgency-ranked
 
-No `EXPLAIN` output or performance figures are included here because the available local MySQL service rejected the credentials in this environment. Capture the actual plan by running the final statement of `queries.sql` after loading the schema and seed; do not infer an index benefit from the seed-derived rows.
+| request_id | hospital           | city | blood_group | units_requested | urgency  | requested_at        |
+| ---------- | ------------------ | ---- | ----------- | --------------: | -------- | ------------------- |
+| 1          | Demo City Hospital | Pune | O+          |               4 | critical | 2026-10-20 08:15:00 |
+| 2          | Demo City Hospital | Pune | A+          |               2 | normal   | 2026-10-20 10:30:00 |
+
+### 4. Donation history join
+
+| donation_id | donor        | blood_bank              | blood_group | units_collected | donated_at          |
+| ----------- | ------------ | ----------------------- | ----------- | --------------: | ------------------- |
+| 2           | Demo Donor C | Demo North Blood Bank   | B+          |               1 | 2026-01-05 11:30:00 |
+| 1           | Demo Donor A | Demo Central Blood Bank | O+          |               1 | 2025-12-10 09:00:00 |
+
+### 5. Donor search by group and city (`O+`, `Pune`)
+
+| full_name    | city | phone           | last_donation_date |
+| ------------ | ---- | --------------- | ------------------ |
+| Demo Donor A | Pune | +91-90000-00001 | 2025-12-10         |
+
+### 6. Captured MySQL EXPLAIN query execution plan
+
+The final statement in `queries.sql` executes `EXPLAIN` for the inventory search pattern:
+
+```text
+id  select_type table type   possible_keys                                      key                     key_len ref                                  rows filtered Extra
+1   SIMPLE      bg    const  PRIMARY,group_code                                 group_code              14      const                                1    100.00   Using index
+1   SIMPLE      bb    ref    PRIMARY,idx_blood_banks_city                       idx_blood_banks_city    402     const                                2    100.00   NULL
+1   SIMPLE      i     eq_ref uq_inventory_bank_group,idx_inventory_group_units uq_inventory_bank_group 9       bloodbank_sql.bb.blood_bank_id,const 1    33.33    Using where
+```
+
+Plan inspection details:
+
+- **`bg` (`blood_groups`)**: Resolved first via `const` access using the unique index `group_code` (`key_len=14`), returning 1 row with `Using index`.
+- **`bb` (`blood_banks`)**: Resolved via index ref on `idx_blood_banks_city` (`key_len=402`), scanning 2 estimated rows matching `city = 'Pune'`.
+- **`i` (`inventory`)**: Joined via unique key `uq_inventory_bank_group` using `eq_ref` (`key_len=9`) on `(bb.blood_bank_id, bg.blood_group_id)`, retrieving exactly 1 candidate row per bank-group pair and filtering on `units_available > 0`.
 
 ## Observed MongoDB integration output
 

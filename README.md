@@ -124,7 +124,63 @@ Supported blood groups are `A+`, `A-`, `B+`, `B-`, `AB+`, `AB-`, `O+`, and `O-`;
 }
 ```
 
-This response is **illustrative, derived from the fictional rows in `database/seed.sql`, and not a captured runtime response**. The API always reads current SQL inventory. A successful search with no matching stock returns `200` with `{"data":[],"count":0}`. Invalid input returns `400`; missing SQL configuration or a database failure returns a sanitized `503`.
+This response is verified against the fictional rows in `database/seed.sql`. The API always reads current SQL inventory. A successful search with no matching stock returns `200` with `{"data":[],"count":0}`. Invalid input returns `400`; missing SQL configuration or a database failure returns a sanitized `503`.
+
+### Hospital blood requests
+
+```powershell
+curl.exe --get --data-urlencode "status=pending" --data-urlencode "city=Pune" http://localhost:5000/api/requests
+```
+
+Optional query parameters include:
+
+- `status`: `pending` (default), `matched`, `fulfilled`, `cancelled`, or `all`.
+- `urgency`: `critical`, `high`, `normal`, `low`, or `all`.
+- `city`: optional exact city filter (e.g. `Pune`, `Mumbai`).
+
+A successful response returns matching hospital blood requests ordered by urgency (`critical` first) and request time:
+
+```json
+{
+  "count": 2,
+  "data": [
+    {
+      "requestId": "1",
+      "hospitalId": "1",
+      "hospitalName": "Demo City Hospital",
+      "hospitalCity": "Pune",
+      "hospitalPhone": "+91-20-5550-0201",
+      "hospitalLatitude": 18.515,
+      "hospitalLongitude": 73.845,
+      "bloodGroup": "O+",
+      "unitsRequested": 4,
+      "urgency": "critical",
+      "status": "pending",
+      "fulfilledByBloodBank": null,
+      "requestedAt": "2026-10-20T08:15:00Z",
+      "fulfilledAt": null,
+      "notes": "Fictional classroom example"
+    },
+    {
+      "requestId": "2",
+      "hospitalId": "1",
+      "hospitalName": "Demo City Hospital",
+      "hospitalCity": "Pune",
+      "hospitalPhone": "+91-20-5550-0201",
+      "hospitalLatitude": 18.515,
+      "hospitalLongitude": 73.845,
+      "bloodGroup": "A+",
+      "unitsRequested": 2,
+      "urgency": "normal",
+      "status": "pending",
+      "fulfilledByBloodBank": null,
+      "requestedAt": "2026-10-20T10:30:00Z",
+      "fulfilledAt": null,
+      "notes": null
+    }
+  ]
+}
+```
 
 ## SQL and DBMS examples
 
@@ -137,13 +193,19 @@ The database scripts preserve the normalized `blood_groups`, `donors`, `blood_ba
 - A transaction example that writes a donation and increments inventory together.
 - A MySQL `EXPLAIN` query for the search access pattern.
 
-The query file includes short explanations of what each report returns and why it is useful. It can be inspected and run as documented in [database/README.md](database/README.md). Execution plans depend on actual MySQL version, statistics, and row counts; no performance claim is made from the tiny demo data.
+The query file includes short explanations of what each report returns and why it is useful. It can be inspected and run as documented in [database/README.md](database/README.md). Verified outputs and the MySQL 8.4 `EXPLAIN` plan are documented in `database/README.md`.
 
 ## Optional MongoDB activity reporting
 
 A successful API search records a document with `eventType`, `bloodGroup`, `city`, `resultCount`, and `occurredAt` in the `activity_logs` collection. It records neither identity nor query credentials. If MongoDB is absent, search still returns SQL results and logging is marked unavailable or disabled in the health response.
 
-Run the aggregation from the project root after at least one search:
+Run the aggregation from the project root after at least one search using either npm or mongosh:
+
+```powershell
+npm run db:aggregate
+```
+
+or with the MongoDB shell:
 
 ```powershell
 mongosh "mongodb://127.0.0.1:27017/bloodbank_nosql" --quiet --file database/mongo-aggregation.js

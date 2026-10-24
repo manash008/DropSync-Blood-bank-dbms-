@@ -41,6 +41,19 @@ test(
         assert.ok(bank.unitsAvailable > 0);
         assert.equal(typeof bank.bloodBankId, "string");
       }
+
+      const reqResponse = await request(app)
+        .get("/api/requests")
+        .query({ status: "pending" })
+        .expect(200);
+
+      assert.ok(reqResponse.body.count >= 2);
+      for (const req of reqResponse.body.data) {
+        assert.equal(req.status, "pending");
+        assert.ok(req.hospitalName);
+        assert.ok(req.bloodGroup);
+        assert.ok(req.unitsRequested > 0);
+      }
     } finally {
       await pool.end();
     }

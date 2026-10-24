@@ -12,7 +12,8 @@
     "test": "node --test",
     "lint": "eslint backend frontend tests eslint.config.js",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "db:aggregate": "node database/run-mongo-aggregation.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
