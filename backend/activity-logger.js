@@ -36,6 +36,14 @@ export async function connectActivityLogger(
           occurredAt: new Date(),
         });
       },
+      recordEvent: async ({ eventType, status, resultCount = 0 }) => {
+        await collection.insertOne({
+          eventType,
+          status,
+          resultCount,
+          occurredAt: new Date(),
+        });
+      },
       close: async () => client.close(),
     };
   } catch (error) {

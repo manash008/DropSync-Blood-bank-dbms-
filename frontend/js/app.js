@@ -6,6 +6,7 @@
 import { BLOOD_GROUPS, MOCK_BLOOD_BANKS } from "./mockData.js";
 import {
   searchBloodAvailability,
+  fetchHospitalRequestsApi,
   getActiveMode,
   setActiveMode,
 } from "./api.js";
@@ -52,6 +53,23 @@ const modalTitle = document.getElementById("modalTitle");
 const modalBody = document.getElementById("modalBody");
 const modalCloseBtn = document.getElementById("modalCloseBtn");
 const modalOverlay = document.getElementById("modalOverlay");
+
+// Requests View Elements
+const tabBanks = document.getElementById("tabBanks");
+const tabRequests = document.getElementById("tabRequests");
+const banksView = document.getElementById("banksView");
+const requestsView = document.getElementById("requestsView");
+const requestStatusSelect = document.getElementById("requestStatusSelect");
+const requestUrgencySelect = document.getElementById("requestUrgencySelect");
+const requestCityInput = document.getElementById("requestCityInput");
+const btnFilterRequests = document.getElementById("btnFilterRequests");
+const btnResetRequests = document.getElementById("btnResetRequests");
+const requestsSummary = document.getElementById("requestsSummary");
+const requestsLoading = document.getElementById("requestsLoading");
+const requestsEmpty = document.getElementById("requestsEmpty");
+const requestsError = document.getElementById("requestsError");
+const requestsErrorMessage = document.getElementById("requestsErrorMessage");
+const requestsList = document.getElementById("requestsList");
 
 /**
  * Initialize application on DOM ready
@@ -151,6 +169,25 @@ function setupEventListeners() {
   window.viewBankDetails = (bankId) => {
     openBankInventoryModal(bankId);
   };
+
+  // View Tab Switching
+  if (tabBanks && tabRequests) {
+    tabBanks.addEventListener("click", () => switchTab("banks"));
+    tabRequests.addEventListener("click", () => switchTab("requests"));
+  }
+
+  // Hospital Requests Filtering
+  if (btnFilterRequests) {
+    btnFilterRequests.addEventListener("click", () => loadHospitalRequests());
+  }
+  if (btnResetRequests) {
+    btnResetRequests.addEventListener("click", () => {
+      if (requestStatusSelect) requestStatusSelect.value = "pending";
+      if (requestUrgencySelect) requestUrgencySelect.value = "all";
+      if (requestCityInput) requestCityInput.value = "";
+      loadHospitalRequests();
+    });
+  }
 }
 
 /**
@@ -444,5 +481,107 @@ function updateModeIndicator() {
     modePill.className = "mode-pill mode-mock";
     modePill.innerHTML = "○ Offline Simulation (Sample Data)";
     if (modeToggleBtn) modeToggleBtn.textContent = "Search Live SQL";
+  }
+}
+
+/**
+ * Tab Switching Handler
+ */
+function switchTab(tabName) {
+  if (tabName === "banks") {
+    tabBanks.classList.add("active");
+    tabBanks.setAttribute("aria-selected", "true");
+    tabRequests.classList.remove("active");
+    tabRequests.setAttribute("aria-selected", "false");
+    banksView.style.display = "block";
+    requestsView.style.display = "none";
+  } else {
+    tabRequests.classList.add("active");
+    tabRequests.setAttribute("aria-selected", "true");
+    tabBanks.classList.remove("active");
+    tabBanks.setAttribute("aria-selected", "false");
+    requestsView.style.display = "block";
+    banksView.style.display = "none";
+    loadHospitalRequests();
+  }
+}
+
+/**
+ * Fetch and Render Hospital Blood Requests
+ */
+async function loadHospitalRequests() {
+  if (!requestsList) return;
+  const status = requestStatusSelect ? requestStatusSelect.value : "pending";
+  const urgency = requestUrgencySelect ? requestUrgencySelect.value : "all";
+  const city = requestCityInput ? requestCityInput.value.trim() : "";
+
+  if (requestsLoading) requestsLoading.style.display = "flex";
+  if (requestsEmpty) requestsEmpty.style.display = "none";
+  if (requestsError) requestsError.style.display = "none";
+  requestsList.innerHTML = "";
+  if (requestsSummary) requestsSummary.innerHTML = "";
+
+  try {
+    const result = await fetchHospitalRequestsApi({ status, urgency, city });
+    if (requestsLoading) requestsLoading.style.display = "none";
+
+    const count = result.count || (result.data ? result.data.length : 0);
+    if (requestsSummary) {
+      const modeLabel = result.isLive
+        ? '<span class="summary-live">Live SQL Records</span>'
+        : '<span class="summary-mock">Sample Data Simulation</span>';
+      requestsSummary.innerHTML = `<strong>${count}</strong> hospital blood request${count === 1 ? "" : "s"} found ${modeLabel}`;
+    }
+
+    if (count === 0) {
+      if (requestsEmpty) requestsEmpty.style.display = "block";
+      return;
+    }
+
+    result.data.forEach((req) => {
+      const card = document.createElement("div");
+      card.className = "request-card";
+      card.innerHTML = `
+        <div class="request-header">
+          <div>
+            <div class="request-hospital-name">${escapeHtml(req.hospitalName)}</div>
+            <div style="font-size: 13px; color: var(--text-muted);">📍 ${escapeHtml(req.hospitalCity)} ${req.hospitalPhone ? "• " + escapeHtml(req.hospitalPhone) : ""}</div>
+          </div>
+          <span class="urgency-badge urgency-${escapeHtml(req.urgency)}">${escapeHtml(req.urgency)}</span>
+        </div>
+        <div class="request-body">
+          <div>
+            <div class="request-blood-badge">🩸 ${escapeHtml(req.bloodGroup)}</div>
+            <div class="request-units">${req.unitsRequested} Unit${req.unitsRequested === 1 ? "" : "s"} Requested</div>
+          </div>
+          <div>
+            <span class="status-badge status-${escapeHtml(req.status)}">${escapeHtml(req.status)}</span>
+          </div>
+        </div>
+        <div class="request-meta">
+          <div><strong>Requested:</strong> ${formatDate(req.requestedAt)}</div>
+          ${req.fulfilledByBloodBank ? `<div><strong>Fulfilled By:</strong> ${escapeHtml(req.fulfilledByBloodBank)}</div>` : ""}
+          ${req.notes ? `<div><strong>Notes:</strong> ${escapeHtml(req.notes)}</div>` : ""}
+        </div>
+      `;
+      requestsList.appendChild(card);
+    });
+  } catch (error) {
+    if (requestsLoading) requestsLoading.style.display = "none";
+    if (requestsError) requestsError.style.display = "block";
+    if (requestsErrorMessage) {
+      requestsErrorMessage.textContent =
+        error.message || "Failed to load hospital requests.";
+    }
+  }
+}
+
+function formatDate(isoString) {
+  if (!isoString) return "N/A";
+  try {
+    const d = new Date(isoString);
+    return isNaN(d.getTime()) ? isoString : d.toLocaleString();
+  } catch {
+    return isoString;
   }
 }

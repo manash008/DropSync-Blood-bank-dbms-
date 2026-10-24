@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import { fileURLToPath } from "node:url";
 import { searchBloodBanks, validateSearchQuery } from "./search.js";
+import { fetchHospitalRequests, validateRequestsQuery } from "./requests.js";
 
 const frontendDirectory = fileURLToPath(
   new URL("../frontend/", import.meta.url),
@@ -104,6 +105,57 @@ export function createApp({
         error: {
           code: "SEARCH_UNAVAILABLE",
           message: "Blood-bank search is temporarily unavailable.",
+        },
+      });
+    }
+  });
+
+  app.get("/api/requests", async (request, response) => {
+    const { errors, values } = validateRequestsQuery(request.query);
+    if (Object.keys(errors).length > 0) {
+      response.status(400).json({
+        error: {
+          code: "INVALID_REQUEST_QUERY",
+          message: "Provide valid request status, urgency, or city filters.",
+          fields: errors,
+        },
+      });
+      return;
+    }
+
+    if (!dbPool) {
+      response.status(503).json({
+        error: {
+          code: "DATABASE_UNAVAILABLE",
+          message: "Hospital requests query is temporarily unavailable.",
+        },
+      });
+      return;
+    }
+
+    try {
+      const data = await fetchHospitalRequests(dbPool, values);
+      Promise.resolve()
+        .then(() =>
+          activityLogger.recordEvent?.({
+            eventType: "hospital_requests_view",
+            status: values.status,
+            resultCount: data.length,
+          }),
+        )
+        .catch(() => {});
+
+      response.json({ data, count: data.length });
+    } catch (error) {
+      console.error(
+        "Hospital requests query failed (" +
+          (error.code || "database error") +
+          ").",
+      );
+      response.status(503).json({
+        error: {
+          code: "REQUESTS_UNAVAILABLE",
+          message: "Hospital requests query is temporarily unavailable.",
         },
       });
     }

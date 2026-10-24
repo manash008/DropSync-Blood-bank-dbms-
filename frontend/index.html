@@ -33,15 +33,29 @@
     </div>
   </header>
 
-  <!-- Fallback Notification (Shown if Leaflet/Map is unavailable) -->
-  <div id="mapFallbackBanner" class="fallback-banner" role="alert">
-    ⚠️ Map visualization could not load. Showing full list results below.
+  <!-- Navigation Tabs -->
+  <div class="view-tabs-container">
+    <nav class="view-tabs" role="tablist" aria-label="Views">
+      <button id="tabBanks" class="view-tab active" role="tab" aria-selected="true" aria-controls="banksView">
+        🩸 Blood Bank Inventory
+      </button>
+      <button id="tabRequests" class="view-tab" role="tab" aria-selected="false" aria-controls="requestsView">
+        🏥 Hospital Blood Requests
+      </button>
+    </nav>
   </div>
 
-  <!-- Search & Filter Controls -->
-  <section class="search-section" aria-label="Search blood banks">
-    <div class="search-container">
-      <form id="searchForm" class="search-form">
+  <!-- Blood Bank Inventory View -->
+  <div id="banksView" role="tabpanel">
+    <!-- Fallback Notification (Shown if Leaflet/Map is unavailable) -->
+    <div id="mapFallbackBanner" class="fallback-banner" role="alert">
+      ⚠️ Map visualization could not load. Showing full list results below.
+    </div>
+
+    <!-- Search & Filter Controls -->
+    <section class="search-section" aria-label="Search blood banks">
+      <div class="search-container">
+        <form id="searchForm" class="search-form">
         <div class="form-group" style="flex: 1 1 180px;">
           <label for="bloodGroupSelect">Required Blood Group</label>
           <select id="bloodGroupSelect" class="form-control" aria-label="Select Blood Group">
@@ -135,6 +149,77 @@
 
     </div>
   </main>
+  </div>
+
+  <!-- Hospital Blood Requests View -->
+  <section id="requestsView" class="requests-section" role="tabpanel" style="display: none;" aria-label="Hospital blood requests">
+    <div class="request-filters">
+      <div class="form-group" style="flex: 1 1 160px;">
+        <label for="requestStatusSelect">Request Status</label>
+        <select id="requestStatusSelect" class="form-control">
+          <option value="pending" selected>Pending</option>
+          <option value="matched">Matched</option>
+          <option value="fulfilled">Fulfilled</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="all">All Statuses</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="flex: 1 1 160px;">
+        <label for="requestUrgencySelect">Urgency Level</label>
+        <select id="requestUrgencySelect" class="form-control">
+          <option value="all" selected>All Urgencies</option>
+          <option value="critical">Critical</option>
+          <option value="high">High</option>
+          <option value="normal">Normal</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="flex: 1 1 200px;">
+        <label for="requestCityInput">Filter by City</label>
+        <input type="text" id="requestCityInput" class="form-control" placeholder="e.g. Pune, Mumbai" />
+      </div>
+
+      <div class="btn-group">
+        <button type="button" class="btn btn-primary" id="btnFilterRequests">
+          Filter Requests
+        </button>
+        <button type="button" class="btn btn-outline-secondary" id="btnResetRequests">
+          Reset
+        </button>
+      </div>
+    </div>
+
+    <div id="requestsSummary" class="results-summary" aria-live="polite">
+      <!-- Summary populated via JS -->
+    </div>
+
+    <!-- Requests Loading Indicator -->
+    <div id="requestsLoading" class="loading-indicator" style="display: none;" role="status">
+      <div class="spinner"></div>
+      <p>Loading hospital blood requests...</p>
+    </div>
+
+    <!-- Requests Empty State -->
+    <div id="requestsEmpty" class="empty-state" style="display: none;">
+      <div class="state-icon">📋</div>
+      <h3>No Hospital Requests Found</h3>
+      <p>No hospital blood requests match the selected filters.</p>
+    </div>
+
+    <!-- Requests Error State -->
+    <div id="requestsError" class="error-state" style="display: none;" role="alert">
+      <div class="state-icon">⚠️</div>
+      <h3>Request Query Error</h3>
+      <p id="requestsErrorMessage">Could not load hospital requests.</p>
+    </div>
+
+    <!-- Requests Grid -->
+    <div id="requestsList" class="requests-grid">
+      <!-- Request cards rendered dynamically via JS -->
+    </div>
+  </section>
 
   <!-- Blood Bank Inventory Modal -->
   <div id="modalOverlay" class="modal-overlay" aria-hidden="true"></div>
@@ -151,7 +236,7 @@
   <!-- Footer -->
   <footer class="app-footer">
     <p>
-      <strong>DropSync Blood Bank Management System</strong> — DBMS Project (SQL + NoSQL Architecture) | Issue #3 Frontend Scope
+      <strong>DropSync Blood Bank Management System</strong> — DBMS Project (SQL + NoSQL Architecture) | Issue #4 Full-Stack Integration
     </p>
   </footer>
 

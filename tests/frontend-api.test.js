@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { searchBloodAvailability, setActiveMode } from "../frontend/js/api.js";
+import {
+  searchBloodAvailability,
+  fetchHospitalRequestsApi,
+  setActiveMode,
+} from "../frontend/js/api.js";
 
 test("frontend sends the documented API query and normalizes live SQL fields", async (context) => {
   const originalFetch = globalThis.fetch;
@@ -127,4 +131,65 @@ test("ALL-mode SQL rows combine into one bank card without inventing missing gro
   assert.equal(result.results[0].units_available, 7);
   assert.deepEqual(result.results[0].full_inventory, { "O+": 5, "A+": 2 });
   assert.equal(result.results[0].inventory_complete, false);
+});
+
+test("frontend fetches hospital requests with proper query parameters and structure", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => {
+    globalThis.fetch = originalFetch;
+    setActiveMode("live");
+  });
+
+  setActiveMode("live");
+  let requestedUrl;
+  globalThis.fetch = async (url) => {
+    requestedUrl = new URL(url);
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        count: 1,
+        data: [
+          {
+            requestId: "1",
+            hospitalId: "1",
+            hospitalName: "Demo City Hospital",
+            hospitalCity: "Pune",
+            bloodGroup: "O+",
+            unitsRequested: 4,
+            urgency: "critical",
+            status: "pending",
+          },
+        ],
+      }),
+    };
+  };
+
+  const result = await fetchHospitalRequestsApi({
+    status: "pending",
+    urgency: "critical",
+    city: "Pune",
+  });
+
+  assert.equal(requestedUrl.pathname, "/api/requests");
+  assert.equal(requestedUrl.searchParams.get("status"), "pending");
+  assert.equal(requestedUrl.searchParams.get("urgency"), "critical");
+  assert.equal(requestedUrl.searchParams.get("city"), "Pune");
+  assert.equal(result.source, "live");
+  assert.equal(result.count, 1);
+  assert.equal(result.data[0].hospitalName, "Demo City Hospital");
+  assert.equal(result.data[0].urgency, "critical");
+});
+
+test("frontend returns mock hospital requests in sample data mode", async () => {
+  setActiveMode("mock");
+  const result = await fetchHospitalRequestsApi({ status: "pending" });
+
+  assert.equal(result.source, "mock");
+  assert.equal(result.isLive, false);
+  assert.ok(result.count >= 1);
+  for (const req of result.data) {
+    assert.equal(req.status, "pending");
+  }
+  setActiveMode("live");
 });

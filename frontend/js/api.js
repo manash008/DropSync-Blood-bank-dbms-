@@ -4,7 +4,11 @@
  * only through the explicit demo-mode toggle.
  */
 import { CONFIG } from "./config.js";
-import { MOCK_BLOOD_BANKS, calculateDistanceKm } from "./mockData.js";
+import {
+  MOCK_BLOOD_BANKS,
+  MOCK_HOSPITAL_REQUESTS,
+  calculateDistanceKm,
+} from "./mockData.js";
 
 let activeMode = CONFIG.FORCE_MOCK ? "mock" : "live";
 
@@ -238,4 +242,55 @@ export function searchBloodAvailability(params) {
   }
 
   return searchLive({ bloodGroup, city, userLat, userLng, availableOnly });
+}
+
+export async function fetchHospitalRequestsApi({
+  status = "pending",
+  urgency = "all",
+  city = "",
+} = {}) {
+  if (activeMode === "mock") {
+    let requests = [...MOCK_HOSPITAL_REQUESTS];
+    if (status && status !== "all") {
+      requests = requests.filter((r) => r.status === status);
+    }
+    if (urgency && urgency !== "all") {
+      requests = requests.filter((r) => r.urgency === urgency);
+    }
+    if (city.trim()) {
+      const cityFilter = city.trim().toLowerCase();
+      requests = requests.filter((r) =>
+        r.hospitalCity.toLowerCase().includes(cityFilter),
+      );
+    }
+    return {
+      source: "mock",
+      isLive: false,
+      count: requests.length,
+      data: requests,
+    };
+  }
+
+  const searchParams = new URLSearchParams();
+  if (status) searchParams.set("status", status);
+  if (urgency) searchParams.set("urgency", urgency);
+  if (city.trim()) searchParams.set("city", city.trim());
+
+  const response = await fetch(
+    `${CONFIG.API_BASE_URL}/requests?${searchParams.toString()}`,
+  );
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody?.error?.message ||
+        `Hospital requests query failed with status ${response.status}.`,
+    );
+  }
+  const payload = await response.json();
+  return {
+    source: "live",
+    isLive: true,
+    count: payload.count,
+    data: payload.data,
+  };
 }

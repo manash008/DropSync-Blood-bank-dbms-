@@ -210,3 +210,65 @@ test("invalid or incomplete coordinates return 400 without querying SQL", async 
   assert.ok(outOfRange.body.error.fields.lat);
   assert.equal(pool.calls.length, 0);
 });
+
+test("valid hospital requests query uses SQL placeholders and returns API fields", async () => {
+  const requestRows = [
+    {
+      requestId: 1,
+      hospitalId: 1,
+      hospitalName: "Demo City Hospital",
+      hospitalCity: "Pune",
+      hospitalPhone: "+91-20-5550-0201",
+      hospitalLatitude: 18.515,
+      hospitalLongitude: 73.845,
+      bloodGroup: "O+",
+      unitsRequested: 4,
+      urgency: "critical",
+      status: "pending",
+      fulfilledByBloodBank: null,
+      requestedAt: "2026-10-20T08:15:00Z",
+      fulfilledAt: null,
+      notes: "Fictional classroom example",
+    },
+  ];
+  const pool = fakePool({ rows: requestRows });
+  const app = createApp({ dbPool: pool });
+  const response = await request(app)
+    .get("/api/requests")
+    .query({ status: "pending", urgency: "critical", city: "Pune" })
+    .expect(200);
+
+  assert.equal(response.body.count, 1);
+  assert.equal(response.body.data[0].requestId, "1");
+  assert.equal(response.body.data[0].hospitalName, "Demo City Hospital");
+  assert.equal(response.body.data[0].bloodGroup, "O+");
+  assert.equal(response.body.data[0].unitsRequested, 4);
+  assert.equal(response.body.data[0].urgency, "critical");
+  assert.match(pool.calls[0].sql, /r\.status = \?/u);
+  assert.match(pool.calls[0].sql, /r\.urgency = \?/u);
+  assert.match(pool.calls[0].sql, /h\.city = \?/u);
+  assert.deepEqual(pool.calls[0].parameters, ["pending", "critical", "Pune"]);
+});
+
+test("invalid requests query parameters return 400 without querying SQL", async () => {
+  const pool = fakePool();
+  const app = createApp({ dbPool: pool });
+
+  const invalid = await request(app)
+    .get("/api/requests")
+    .query({ status: "invalid_status", urgency: "extreme" })
+    .expect(400);
+
+  assert.equal(invalid.body.error.code, "INVALID_REQUEST_QUERY");
+  assert.ok(invalid.body.error.fields.status);
+  assert.ok(invalid.body.error.fields.urgency);
+  assert.equal(pool.calls.length, 0);
+});
+
+test("requests endpoint reports safe 503 when database configuration is missing", async () => {
+  const app = createApp();
+  const response = await request(app).get("/api/requests").expect(503);
+
+  assert.equal(response.body.error.code, "DATABASE_UNAVAILABLE");
+  assert.equal(JSON.stringify(response.body).includes("password"), false);
+});
