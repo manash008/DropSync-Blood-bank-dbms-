@@ -1,12 +1,16 @@
-const db = require('../config/db');
+const db = require("../config/db");
 
 /**
  * Get all blood groups
  */
 async function getBloodGroups(req, res, next) {
   try {
-    const groups = await db.query('SELECT blood_group_id, group_code FROM blood_groups ORDER BY blood_group_id ASC');
-    return res.status(200).json({ success: true, count: groups.length, data: groups });
+    const groups = await db.query(
+      "SELECT blood_group_id, group_code FROM blood_groups ORDER BY blood_group_id ASC",
+    );
+    return res
+      .status(200)
+      .json({ success: true, count: groups.length, data: groups });
   } catch (error) {
     next(error);
   }
@@ -18,17 +22,20 @@ async function getBloodGroups(req, res, next) {
 async function getBloodBanks(req, res, next) {
   try {
     const { city } = req.query;
-    let sql = 'SELECT blood_bank_id, name, address, city, phone, latitude, longitude FROM blood_banks';
+    let sql =
+      "SELECT blood_bank_id, name, address, city, phone, latitude, longitude FROM blood_banks";
     const params = [];
 
     if (city && city.trim()) {
-      sql += ' WHERE LOWER(city) = LOWER(?)';
+      sql += " WHERE LOWER(city) = LOWER(?)";
       params.push(city.trim());
     }
 
-    sql += ' ORDER BY name ASC';
+    sql += " ORDER BY name ASC";
     const banks = await db.query(sql, params);
-    return res.status(200).json({ success: true, count: banks.length, data: banks });
+    return res
+      .status(200)
+      .json({ success: true, count: banks.length, data: banks });
   } catch (error) {
     next(error);
   }
@@ -40,17 +47,20 @@ async function getBloodBanks(req, res, next) {
 async function getHospitals(req, res, next) {
   try {
     const { city } = req.query;
-    let sql = 'SELECT hospital_id, name, address, city, phone, latitude, longitude FROM hospitals';
+    let sql =
+      "SELECT hospital_id, name, address, city, phone, latitude, longitude FROM hospitals";
     const params = [];
 
     if (city && city.trim()) {
-      sql += ' WHERE LOWER(city) = LOWER(?)';
+      sql += " WHERE LOWER(city) = LOWER(?)";
       params.push(city.trim());
     }
 
-    sql += ' ORDER BY name ASC';
+    sql += " ORDER BY name ASC";
     const hospitals = await db.query(sql, params);
-    return res.status(200).json({ success: true, count: hospitals.length, data: hospitals });
+    return res
+      .status(200)
+      .json({ success: true, count: hospitals.length, data: hospitals });
   } catch (error) {
     next(error);
   }
@@ -66,16 +76,18 @@ async function getDonors(req, res, next) {
     const params = [];
 
     if (blood_group && blood_group.trim()) {
-      conditions.push('bg.group_code = ?');
+      conditions.push("bg.group_code = ?");
       params.push(blood_group.trim().toUpperCase());
     }
 
     if (city && city.trim()) {
-      conditions.push('LOWER(d.city) = LOWER(?)');
+      conditions.push("LOWER(d.city) = LOWER(?)");
       params.push(city.trim());
     }
 
-    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const whereClause = conditions.length
+      ? `WHERE ${conditions.join(" AND ")}`
+      : "";
 
     const sql = `
       SELECT
@@ -95,7 +107,9 @@ async function getDonors(req, res, next) {
     `;
 
     const donors = await db.query(sql, params);
-    return res.status(200).json({ success: true, count: donors.length, data: donors });
+    return res
+      .status(200)
+      .json({ success: true, count: donors.length, data: donors });
   } catch (error) {
     next(error);
   }
@@ -106,16 +120,22 @@ async function getDonors(req, res, next) {
  * Direct demonstration of atomic transaction from database/queries.sql.
  */
 async function recordDonation(req, res, next) {
-  const { donor_id, blood_bank_id, blood_group_id, units_collected = 1, notes } = req.body;
+  const {
+    donor_id,
+    blood_bank_id,
+    blood_group_id,
+    units_collected = 1,
+    notes,
+  } = req.body;
 
   // Validation
   if (!donor_id || !blood_bank_id || !blood_group_id) {
     return res.status(400).json({
       success: false,
       error: {
-        code: 'VALIDATION_ERROR',
-        message: 'donor_id, blood_bank_id, and blood_group_id are required'
-      }
+        code: "VALIDATION_ERROR",
+        message: "donor_id, blood_bank_id, and blood_group_id are required",
+      },
     });
   }
 
@@ -135,7 +155,7 @@ async function recordDonation(req, res, next) {
       blood_bank_id,
       blood_group_id,
       units,
-      notes || 'Donation via API'
+      notes || "Donation via API",
     ]);
 
     // 2. Upsert inventory stock atomically
@@ -144,7 +164,11 @@ async function recordDonation(req, res, next) {
       VALUES (?, ?, ?) AS incoming
       ON DUPLICATE KEY UPDATE units_available = inventory.units_available + incoming.units_available
     `;
-    await connection.execute(upsertInventorySql, [blood_bank_id, blood_group_id, units]);
+    await connection.execute(upsertInventorySql, [
+      blood_bank_id,
+      blood_group_id,
+      units,
+    ]);
 
     // 3. Update donor's last_donation_date
     const updateDonorSql = `UPDATE donors SET last_donation_date = CURDATE() WHERE donor_id = ?`;
@@ -154,14 +178,14 @@ async function recordDonation(req, res, next) {
 
     return res.status(201).json({
       success: true,
-      message: 'Donation recorded and inventory incremented atomically',
+      message: "Donation recorded and inventory incremented atomically",
       data: {
         donation_id: donationResult.insertId,
         donor_id,
         blood_bank_id,
         blood_group_id,
-        units_collected: units
-      }
+        units_collected: units,
+      },
     });
   } catch (error) {
     await connection.rollback();
@@ -176,5 +200,5 @@ module.exports = {
   getBloodBanks,
   getHospitals,
   getDonors,
-  recordDonation
+  recordDonation,
 };

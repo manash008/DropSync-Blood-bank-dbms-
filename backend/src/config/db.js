@@ -1,20 +1,20 @@
-const mysql = require('mysql2/promise');
-const dotenv = require('dotenv');
+const mysql = require("mysql2/promise");
+const dotenv = require("dotenv");
 
 dotenv.config();
 
 // Pool configuration using environment variables
 const poolConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '3306', 10),
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'bloodbank_sql',
+  host: process.env.DB_HOST || "localhost",
+  port: parseInt(process.env.DB_PORT || "3306", 10),
+  user: process.env.DB_USER || "root",
+  password: process.env.DB_PASSWORD || "",
+  database: process.env.DB_NAME || "bloodbank_sql",
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
   enableKeepAlive: true,
-  keepAliveInitialDelay: 0
+  keepAliveInitialDelay: 0,
 };
 
 // Create the connection pool
@@ -37,16 +37,18 @@ async function query(sql, params = []) {
  */
 async function testConnection() {
   try {
-    const [rows] = await pool.query('SELECT 1 AS check_result, NOW() AS server_time');
+    const [rows] = await pool.query(
+      "SELECT 1 AS check_result, NOW() AS server_time",
+    );
     return {
       connected: true,
-      message: 'Database connection successful',
-      serverTime: rows[0].server_time
+      message: "Database connection successful",
+      serverTime: rows[0].server_time,
     };
   } catch (error) {
     return {
       connected: false,
-      message: `Database connection failed: ${error.message}`
+      message: `Database connection failed: ${error.message}`,
     };
   }
 }
@@ -63,5 +65,5 @@ module.exports = {
   pool,
   query,
   testConnection,
-  getConnection
+  getConnection,
 };
