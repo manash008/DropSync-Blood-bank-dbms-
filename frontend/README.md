@@ -1,117 +1,61 @@
-# 🩸 DropSync Frontend — Blood Availability Search & Map View
+# DropSync Frontend
 
-This directory contains the user-facing interface for **DropSync**, resolving **[Issue #3: Build frontend for blood availability search and map view](https://github.com/manash008/DropSync-Blood-bank-dbms-/issues/3)**.
+This responsive HTML/CSS/JavaScript interface is served from `frontend/` by the Express app. It searches the MySQL-backed API, renders inventory results, and plots facilities with valid coordinates on Leaflet/OpenStreetMap.
 
----
+## Start the application
 
-## 🌟 Features Implemented
-
-1. **Blood Group & Proximity Search:**
-   - Dropdown selection across all 8 blood groups (`A+`, `A-`, `B+`, `B-`, `AB+`, `AB-`, `O+`, `O-`) or all groups simultaneously.
-   - City search filter (e.g. `Pune`, `Mumbai`).
-   - Browser geolocation button (**"📍 Use My Location"**) to calculate and rank results by real-time distance in kilometers using the Haversine formula.
-   - Toggle to filter only facilities with units in stock.
-
-2. **Interactive Map (Leaflet + OpenStreetMap):**
-   - Color-coded map pins:
-     - 🟢 **Green Pin:** Blood in stock for the selected blood group.
-     - 🔴 **Red Pin:** Out of stock (0 units).
-     - 🔵 **Blue Pulsing Marker:** User's detected coordinates.
-   - Rich popup cards with blood bank name, address, phone number, and a direct link to view full facility stock.
-   - Automatic map bounds zooming to include all results and user location.
-
-3. **Fallback & Robust Error/State Handling:**
-   - **List-based fallback:** If map tiles or Leaflet fail to load, a warning banner appears and full search/filter functionality remains operational via the results list.
-   - Dedicated UI states: **Loading spinner**, **Empty results state**, and **Error state**.
-
-4. **Integration Boundary & Clear Data Mode Flagging:**
-   - **Mode Indicator:** Displays whether the data is coming from the live Node.js/Express backend or local sample data.
-   - **Simulated Sample Data:** Perfectly aligns with `database/schema.sql` and `database/seed.sql` (Pune and Mumbai facilities).
-   - Never misleads users: Offline sample data is explicitly badged as `○ Simulated Sample Data` so mock stock is never mistaken for live hospital units.
-   - **One-click toggle button:** Easily switch between testing against the live backend (`localhost:5000`) and the offline demo dataset.
-
-5. **Facility Inventory Breakdown Modal:**
-   - Click "🩸 View Full Stock" on any card or map popup to view an 8-tile breakdown of all blood groups for that specific blood bank.
-
----
-
-## 🚀 How to Run Locally
-
-You can run the frontend with any static HTTP server. Choose any of the following:
-
-### Option 1: Python 3 (Installed by default on macOS)
 From the repository root:
-```bash
-cd frontend
-python3 -m http.server 3000
-```
-Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 
-### Option 2: VS Code Live Server
-1. Open the repository in VS Code.
-2. Right-click `frontend/index.html`.
-3. Select **"Open with Live Server"**.
-
-### Option 3: Node.js `serve` / `http-server` (if Node is installed)
-```bash
-npx serve frontend -p 3000
+```powershell
+npm ci
+Copy-Item .env.example .env
+# Set DB_HOST, DB_NAME, DB_USER, and DB_PASSWORD in .env
+npm run dev
 ```
 
----
+Open `http://localhost:5000`. For a frontend-only offline walkthrough, run `python -m http.server 3000 --directory frontend`, open `http://localhost:3000`, and choose **Switch to Simulated Data**. When using that separate static server with a live API, set `window.DROPSYNC_API_BASE_URL` to `http://localhost:5000/api` and set backend `FRONTEND_URL` to `http://localhost:3000`. The badge and result notice identify sample inventory as simulated. The live mode never silently substitutes demo results after an API error.
 
-## ⚙️ Configuration (`frontend/js/config.js`)
+The Express app serves `frontend/index.html`, styles, modules, and the API from one origin by default. If hosting the frontend separately, set `window.DROPSYNC_API_BASE_URL` before `js/app.js` loads and set backend `FRONTEND_URL` to the frontend's exact origin. CORS allows that configured origin only.
 
-Edit `frontend/js/config.js` to change connection settings:
+## Search behavior and API contract
 
-```javascript
-export const CONFIG = {
-  // Base URL for Issue #2 Backend API
-  API_BASE_URL: 'http://localhost:5000/api',
-
-  // Fallback to sample data when backend is not running
-  AUTO_FALLBACK_TO_MOCK: true,
-
-  // Force mock mode for standalone offline demos
-  FORCE_MOCK: true,
-
-  // Default map center (Pune, Maharashtra)
-  DEFAULT_CENTER: {
-    lat: 18.5204,
-    lng: 73.8567,
-    name: 'Pune',
-    zoom: 12
-  }
-};
-```
-
----
-
-## 🔗 Backend Contract (Connecting to Issue #2)
-
-When the backend is running (`npm start` under `backend/` on port 5000), the frontend queries:
+The frontend requests:
 
 ```http
-GET /api/inventory/search?blood_group=O+&city=Pune&available_only=true
+GET /api/blood-banks?bloodGroup=O%2B&city=Pune
 ```
 
-Expected JSON response format from backend:
+The same endpoint accepts `bloodGroup=ALL` for every recorded inventory row, an omitted `city` to search all cities, and paired `lat`/`lng` coordinates from the location button. Coordinates are validated by the API; returned facilities are distance-sorted when coordinates are supplied. The **Only in-stock banks** filter is applied to returned SQL rows. Zero-unit rows remain visible when the filter is off.
+
+Successful API rows use camelCase fields:
+
 ```json
 {
-  "status": "success",
+  "count": 1,
   "data": [
     {
-      "blood_bank_id": 1,
+      "bloodBankId": "1",
       "name": "Demo Central Blood Bank",
       "address": "10 Sample Road",
       "city": "Pune",
       "phone": "+91-20-5550-0101",
-      "latitude": 18.520400,
-      "longitude": 73.856700,
-      "blood_group": "O+",
-      "units_available": 12
+      "latitude": 18.5204,
+      "longitude": 73.8567,
+      "bloodGroup": "O+",
+      "unitsAvailable": 12
     }
   ]
 }
 ```
 
-If the backend is not running, the frontend automatically falls back to the embedded mock data without crashing.
+`count` reports distinct blood banks. In `ALL` mode, `data` may contain one row per bank and blood group; the UI combines those records into a bank card and shows the returned group rows in its inventory dialog. It does not infer that an unreturned group has zero units.
+
+Invalid search input returns `400`; SQL not configured or unavailable returns a sanitized `503`. The UI displays those errors instead of presenting them as live results.
+
+## Map and data limitations
+
+- Search and the results list work without the map service or any map key.
+- The map uses the Leaflet library and OpenStreetMap tiles loaded from their public CDNs. If they are unreachable, a warning appears and list search remains usable.
+- Markers are drawn only when SQL provides latitude and longitude.
+- Names, addresses, telephone details, and inventory in the included seed and sample records are fictional classroom data. They are not a real-time blood supply.
+- No Google Maps API key is needed or used.
