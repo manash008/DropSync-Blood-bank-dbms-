@@ -20,13 +20,13 @@ INSERT INTO donors (donor_id,full_name,email,phone,blood_group_id,city,latitude,
 INSERT INTO inventory (blood_bank_id,blood_group_id,units_available) VALUES
 (1,1,8),(1,3,5),(1,7,12),(1,8,2),(2,1,3),(2,5,4),(2,7,6),(3,3,7),(3,7,9),(3,8,3);
 
-INSERT INTO requests (request_id,hospital_id,blood_group_id,units_requested,urgency,status,requested_at,notes) VALUES
-(1,1,7,4,'critical','pending','2026-10-20 08:15:00','Fictional classroom example'),
-(2,1,1,2,'normal','pending','2026-10-20 10:30:00',NULL),
-(3,2,3,3,'high','matched','2026-10-19 14:00:00',NULL),
-(4,2,8,1,'low','fulfilled','2026-10-18 09:00:00',NULL);
+INSERT INTO requests (request_id,hospital_id,blood_group_id,units_requested,urgency,status,requested_at,fulfilled_at,notes) VALUES
+(1,1,7,4,'critical','pending','2026-10-20 08:15:00',NULL,'Fictional classroom example'),
+(2,1,1,2,'normal','pending','2026-10-20 10:30:00',NULL,NULL),
+(3,2,3,3,'high','matched','2026-10-19 14:00:00',NULL,NULL),
+(4,2,8,1,'low','fulfilled','2026-10-18 09:00:00','2026-10-18 11:20:00',NULL);
 
-UPDATE requests SET fulfilled_by_blood_bank_id=3, fulfilled_at='2026-10-18 11:20:00' WHERE request_id=4;
+UPDATE requests SET fulfilled_by_blood_bank_id=3 WHERE request_id=4;
 
 INSERT INTO donations (donation_id,donor_id,blood_bank_id,blood_group_id,units_collected,donated_at,notes) VALUES
 (1,1,1,7,1,'2025-12-10 09:00:00','Fictional demo record'),
