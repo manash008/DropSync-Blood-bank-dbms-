@@ -287,7 +287,10 @@ dropsync/
 └── README.md       # Project documentation
 ```
 
-> **Repository status:** SQL schema, seed data, and query examples are implemented under `database/`. Backend, frontend, and MongoDB integration remain planned.
+> **Repository status:** 
+> - **Database:** MySQL relational schema, seed data, and query examples implemented under `database/`.
+> - **Backend:** Node.js + Express REST API foundation and SQL integration implemented under `backend/` (Health check, parameterized inventory search, hospital requests, metadata endpoints, and atomic donation transaction). Authentication is marked pending until a user/role schema table is decided.
+> - **Frontend & MongoDB:** Frontend UI and MongoDB activity logging remain planned in subsequent phases.
 
 ## 🔮 Future Scope
 
