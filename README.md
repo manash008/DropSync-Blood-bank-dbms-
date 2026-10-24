@@ -1,316 +1,192 @@
-# 🩸 DropSync — Blood Bank Database Management System
+# DropSync — Blood Bank Database Management System
 
-> **Find the right blood. Find it nearby. Act faster.**
+DropSync is a local academic demo for searching blood-bank inventory by blood group and city. The implemented path is a static browser UI, an Express API, and the existing MySQL relational model. Optional MongoDB logging records successful search summaries.
 
-DropSync is a Blood Bank Database Management System designed to help patients and hospitals find nearby blood banks and check blood availability by blood group.
+All included people, contact details, addresses, and inventory are fictional classroom records. They are not real-time blood availability.
 
-The project follows a **SQL + NoSQL architecture**: SQL handles structured relational data such as donors, blood banks, hospitals, inventory, requests and donations, while MongoDB is intended for flexible operational data such as activity logs and future delivery requests.
+## Implemented features
 
-## 🎯 Problem Statement
+- Parameterized MySQL search across `inventory`, `blood_banks`, and `blood_groups`.
+- Responsive search UI with blood-group and city validation, loading, empty-result, and backend-error states.
+- Results include bank name, address, phone, blood group, units, and coordinates when present. Leaflet/OpenStreetMap plots facilities with coordinates; browser location can distance-sort results.
+- Optional MongoDB `activity_logs` search events and an aggregation report. SQL search works if MongoDB is unconfigured or unavailable.
+- Existing relational schema, seed data, joins, reports, indexes, and EXPLAIN example in `database/`.
 
-During an emergency, finding the required blood group quickly can be difficult. Blood availability may be distributed across multiple blood banks, and manually checking each location can waste valuable time.
-
-DropSync aims to provide a centralized platform for:
-
-- Finding nearby blood banks.
-- Checking blood-group availability and units.
-- Managing donor information and donation records.
-- Allowing hospitals to raise blood requests.
-- Matching requests with available inventory and nearby donors.
-- Generating useful database reports.
-
-## ✨ Key Features
-
-### 🔎 Nearby Blood Bank Search
-Select a blood group and use location information to identify nearby blood banks.
-
-### 🩸 Blood Inventory Management
-Maintain blood stock by blood group and blood bank.
-
-### 👤 Donor Management
-Store donor information and donation history.
-
-### 🏥 Hospital Requests
-Hospitals can raise requests containing the required blood group, units, status and request time.
-
-### 📍 Location-Based Matching
-Use blood-group availability and proximity to identify suitable blood banks/donors.
-
-### 📊 Reports
-SQL aggregation can provide reports such as total available units per blood group per city.
-
-### 📝 Activity Logging
-MongoDB is planned for flexible data such as login attempts and search history.
-
-### 🚚 Delivery Integration — Future
-The architecture can support a future delivery-provider API/webhook without redesigning the core system.
-
-## 🏗️ System Architecture
+## Architecture
 
 ```text
-User
- │
- ▼
-Frontend (React / HTML-CSS-JS)
- │
- │ REST API
- ▼
-Backend (Node.js + Express)
- │
- ├───────────────┬────────────────┐
- ▼               ▼                ▼
-MySQL/          MongoDB          Maps
-PostgreSQL      NoSQL            Service
- │               │
- ├─ Donors       ├─ Activity Logs
- ├─ Blood Banks  └─ Delivery Requests
- ├─ Hospitals
- ├─ Inventory
- ├─ Requests
- └─ Donations
+Browser (static HTML/CSS/JS served by Express)
+                     │
+                     ▼
+          GET /api/blood-banks
+                     │
+        ┌────────────┴────────────┐
+        ▼                         ▼
+ MySQL 8.0.19+             Optional MongoDB
+ donors, banks,            activity_logs
+ hospitals, inventory,     search summaries
+ requests, donations
 ```
 
-## 🧰 Tech Stack
+The SQL model is the source of truth for inventory. MongoDB only receives search group, city, result count, and timestamp. Passwords, tokens, IP addresses, and donor contact details are not logged.
 
-| Layer | Technology | Purpose |
-|---|---|---|
-| Frontend | React or HTML/CSS/JavaScript | Login, dashboards, search and map UI |
-| Backend | Node.js + Express | REST APIs and application logic |
-| Primary DB | MySQL / PostgreSQL | Structured relational data |
-| Secondary DB | MongoDB | Logs and flexible operational data |
-| Maps | Leaflet + OpenStreetMap or Google Maps | Nearby blood-bank visualization |
-| Authentication | JWT + bcrypt | Authentication and password hashing |
-| API Testing | Postman / Thunder Client | API testing |
-| Configuration | `.env` | Credentials and API configuration |
+## Prerequisites
 
-## 🗄️ Database Design
+- Node.js 20.19+, 22.13+, or 24+ and npm.
+- MySQL 8.0.19 or newer with the InnoDB engine.
+- MongoDB Community Server only if activity logging is wanted.
+- `mysql` command-line client for local SQL initialization.
+- `mongosh` for running the aggregation example.
 
-### SQL Tables
+The embedded map uses Leaflet and OpenStreetMap; it needs external tile access but no Google Maps key. Search and the results list work when those map assets are unavailable.
 
-| Table | Main Purpose |
-|---|---|
-| `donors` | Donor details, blood group, contact and location |
-| `blood_banks` | Blood-bank details, address and location |
-| `hospitals` | Hospital information |
-| `inventory` | Available units by blood bank and blood group |
-| `requests` | Hospital blood requests |
-| `donations` | Recorded donations |
+## Local setup
 
-### SQL Concepts
+1. Install the Node dependencies and create a local environment file:
 
-- Primary and foreign keys
-- Referential integrity
-- SQL joins
-- Indexing
-- Filtering and sorting
-- Aggregation queries
-- Transactions
-- Query optimization with `EXPLAIN`
+   ```powershell
+   npm ci
+   Copy-Item .env.example .env
+   ```
 
-### MongoDB Collections
+2. Edit `.env` with your local MySQL host, database, user, and password. The example uses `bloodbank_sql`. Never commit `.env` or real credentials.
 
-- `activity_logs` — login attempts and search history.
-- `delivery_requests` — flexible delivery-partner payloads for future integration.
+3. Create and load the SQL database. See [database setup and query notes](database/README.md). The schema and seed scripts create tables and fictional demo records; run them against a new empty database.
 
-A MongoDB aggregation pipeline can be used to group/analyze requests by urgency or location.
+4. Optionally start MongoDB and keep `MONGO_URI` set to a database URI ending in `/bloodbank_nosql`. Leave `MONGO_URI` blank to run without MongoDB. A Mongo connection failure disables logging but does not disable SQL search.
 
-## 🔄 Core Workflow
+5. Start the app:
+
+   ```powershell
+   npm run dev
+   ```
+
+   Open [http://localhost:5000](http://localhost:5000). For a normal start without file watching, use `npm start`.
+
+The Express server serves the frontend and API from one origin by default. If you host the frontend separately, set `FRONTEND_URL` to that exact origin and configure `window.DROPSYNC_API_BASE_URL` in the frontend; CORS is restricted to the configured origin. See [frontend setup and behavior](frontend/README.md).
+
+## Environment variables
+
+| Variable       | Required                 | Default / use                                                               |
+| -------------- | ------------------------ | --------------------------------------------------------------------------- |
+| `PORT`         | No                       | HTTP port; defaults to `5000`.                                              |
+| `FRONTEND_URL` | No                       | Allowed browser origin; defaults to `http://localhost:5000`.                |
+| `DB_HOST`      | For SQL search           | MySQL hostname.                                                             |
+| `DB_PORT`      | No                       | MySQL port; defaults to `3306`.                                             |
+| `DB_NAME`      | For SQL search           | Database containing the schema.                                             |
+| `DB_USER`      | For SQL search           | MySQL account.                                                              |
+| `DB_PASSWORD`  | Depends on local account | MySQL password; an empty value is accepted for passwordless local accounts. |
+| `MONGO_URI`    | No                       | MongoDB connection string; blank disables logging.                          |
+
+The backend starts without SQL settings so the page and health route remain available, but database search responds with a safe `503` until SQL is configured. Authentication and `JWT_SECRET` are not implemented because the schema has no user or role table.
+
+## API
+
+### Health/readiness
+
+`GET /api/health` returns database readiness and whether activity logging is enabled. It returns `503` when MySQL is not configured or cannot be reached.
+
+### Search inventory
+
+```powershell
+curl.exe --get --data-urlencode "bloodGroup=O+" --data-urlencode "city=Pune" http://localhost:5000/api/blood-banks
+```
+
+Supported blood groups are `A+`, `A-`, `B+`, `B-`, `AB+`, `AB-`, `O+`, and `O-`; use `ALL` to search every recorded group. `city` is optional for an all-city search. The location button supplies paired `lat`/`lng` coordinates and sorts matching results by distance. A successful response returns these fields:
+
+```json
+{
+  "count": 2,
+  "data": [
+    {
+      "bloodBankId": "1",
+      "name": "Demo Central Blood Bank",
+      "address": "10 Sample Road",
+      "city": "Pune",
+      "phone": "+91-20-5550-0101",
+      "latitude": 18.5204,
+      "longitude": 73.8567,
+      "bloodGroup": "O+",
+      "unitsAvailable": 12
+    },
+    {
+      "bloodBankId": "2",
+      "name": "Demo Riverside Blood Bank",
+      "address": "22 Example Avenue",
+      "city": "Pune",
+      "phone": "+91-20-5550-0102",
+      "latitude": 18.5362,
+      "longitude": 73.8939,
+      "bloodGroup": "O+",
+      "unitsAvailable": 6
+    }
+  ]
+}
+```
+
+This response is **illustrative, derived from the fictional rows in `database/seed.sql`, and not a captured runtime response**. The API always reads current SQL inventory. A successful search with no matching stock returns `200` with `{"data":[],"count":0}`. Invalid input returns `400`; missing SQL configuration or a database failure returns a sanitized `503`.
+
+## SQL and DBMS examples
+
+The database scripts preserve the normalized `blood_groups`, `donors`, `blood_banks`, `hospitals`, `inventory`, `requests`, and `donations` model. The API joins inventory to blood banks and blood groups; `ALL` returns the bank/group records so the frontend can group actual inventory. The in-stock checkbox filters zero-unit rows in the UI. The scripts include:
+
+- Joins for inventory search, pending hospital requests, donation history, and donor search.
+- Aggregation of available units by city and blood group.
+- Foreign keys, unique inventory per bank/group, positive-unit checks, and coordinate checks.
+- Indexes for donor group/city, bank/hospital city, inventory group/stock, request status/urgency/date, and donation history.
+- A transaction example that writes a donation and increments inventory together.
+- A MySQL `EXPLAIN` query for the search access pattern.
+
+The query file includes short explanations of what each report returns and why it is useful. It can be inspected and run as documented in [database/README.md](database/README.md). Execution plans depend on actual MySQL version, statistics, and row counts; no performance claim is made from the tiny demo data.
+
+## Optional MongoDB activity reporting
+
+A successful API search records a document with `eventType`, `bloodGroup`, `city`, `resultCount`, and `occurredAt` in the `activity_logs` collection. It records neither identity nor query credentials. If MongoDB is absent, search still returns SQL results and logging is marked unavailable or disabled in the health response.
+
+Run the aggregation from the project root after at least one search:
+
+```powershell
+mongosh "mongodb://127.0.0.1:27017/bloodbank_nosql" --quiet --file database/mongo-aggregation.js
+```
+
+It groups actual search events by blood group and city. `searchCount` is how often that combination was searched; `matchingBanksReturned` sums the result counts returned by those searches. An empty collection produces no result documents. The collection and aggregation are documented in [database/README.md](database/README.md).
+
+## Checks
+
+```powershell
+npm test
+npm run lint
+npm run format:check
+```
+
+The API tests use a fake SQL pool to cover parameterization, validation, location sorting, empty results, sanitized failures, CORS, static UI serving, and Mongo failure tolerance. Frontend API tests verify the documented query and field mapping, including visible backend failures. The standard test run does not require MySQL. A read-only MySQL integration test runs when `MYSQL_TEST_DATABASE` is set and `.env` contains valid connection settings. A MongoDB integration test runs when `MONGO_TEST_URI` is set; it writes one isolated test event, verifies the aggregation, and removes that event.
+
+For optional integration checks in PowerShell, configure `.env` and run:
+
+```powershell
+$env:MYSQL_TEST_DATABASE = "bloodbank_sql"
+$env:MONGO_TEST_URI = "mongodb://127.0.0.1:27017/bloodbank_nosql"
+npm test
+Remove-Item Env:MYSQL_TEST_DATABASE, Env:MONGO_TEST_URI
+```
+
+The MySQL test only reads from the explicitly selected database. The MongoDB test removes its temporary test event when it completes.
+
+## Known limitations and future work
+
+- Only search and readiness routes are implemented; request management, donor CRUD, donation writes through the API, and authentication are not exposed.
+- Search filters by blood group and optional city. Browser location distance-sorts returned coordinates; it does not guarantee physical availability. The UI shows zero-unit SQL inventory unless the in-stock filter is selected.
+- The map uses Leaflet and OpenStreetMap tiles from public CDNs, with a list fallback when map assets are unavailable. No Google Maps key is required.
+- MongoDB is optional and currently stores successful search summaries only. Login-attempt and request events are not supported because those flows do not exist yet.
+- Delivery-provider integration, including Porter, remains future scope.
+- Keep MySQL and MongoDB on trusted local networks and use least-privilege credentials for any shared deployment.
+
+## Project files
 
 ```text
-1. User selects required blood group
-              ↓
-2. User provides location
-              ↓
-3. Backend receives search request
-              ↓
-4. SQL checks blood inventory
-              ↓
-5. Nearby blood banks are calculated/ranked
-              ↓
-6. Results are returned to frontend
-              ↓
-7. User views availability and contact details
+backend/       Express app, SQL pool, search, and optional activity logging
+frontend/      Static Leaflet search/map UI served by Express
+database/      MySQL schema, fictional seed data, reports, and Mongo aggregation
+tests/         API tests and optional MongoDB integration test
+.env.example   Placeholder configuration only
 ```
-
-For hospital requests:
-
-```text
-Hospital creates request
-        ↓
-Blood group + units + location/status
-        ↓
-Check inventory
-        ↓
-Find suitable nearby blood banks/donors
-        ↓
-Return matching options
-```
-
-## 📈 DBMS Concepts Demonstrated
-
-DropSync is intended to demonstrate practical DBMS concepts, including:
-
-### SQL Queries
-
-- Joining donors, blood banks, inventory and requests.
-- Finding available units for a blood group.
-- Finding blood banks based on location.
-- Calculating total units per blood group per city.
-- Updating inventory after a donation.
-- Retrieving pending requests.
-
-### Indexing
-
-Frequently searched fields such as `blood_group`, location fields and foreign-key columns can be indexed for faster queries.
-
-### Transactions
-
-Donation-related inventory changes should be performed transactionally so the donation record and stock update remain consistent.
-
-### Query Optimization
-
-`EXPLAIN` can be used to inspect execution plans and justify indexing/query improvements.
-
-### MongoDB Aggregation
-
-MongoDB aggregation can summarize flexible activity/request data, such as grouping requests by urgency or location.
-
-## 🗺️ Development Roadmap
-
-### Phase 1 — Authentication & Core DB
-
-- Login/Register
-- Donor, hospital and admin roles
-- Password hashing
-- JWT sessions
-- CRUD operations
-- SQL schema and seed data
-
-### Phase 2 — Search & Maps
-
-- Location access
-- Nearby blood-bank search
-- Distance-based ranking
-- Map visualization
-- Blood-group availability
-
-### Phase 3 — Requests & Matching
-
-- Hospital blood requests
-- Inventory matching
-- Donor matching
-- Blood-group and proximity filtering
-- Request status management
-
-### Phase 4 — Delivery Integration
-
-- Delivery service abstraction
-- Future Porter/API/webhook integration
-- Pluggable delivery-provider design
-
-### Phase 5 — Optimization & Documentation
-
-- SQL indexes
-- `EXPLAIN` analysis
-- MongoDB aggregation
-- Query optimization
-- Test data and sample outputs
-- Complete project documentation
-
-## 💻 Local Development Setup
-
-### Prerequisites
-
-- Node.js
-- MySQL or PostgreSQL
-- MongoDB Community Server
-- MongoDB Compass
-- Git
-- Postman or Thunder Client
-
-### Databases
-
-```text
-SQL:     bloodbank_sql
-MongoDB: bloodbank_nosql
-```
-
-The SQL schema, fictional seed data, and example queries are available in the [database directory](database/README.md). The current scripts target MySQL 8.0.19+. MongoDB setup and the application services remain planned work.
-
-### Environment Variables
-
-Create a `.env` file for local configuration. Example:
-
-```env
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=yourpassword
-MONGO_URI=mongodb://localhost:27017/bloodbank_nosql
-JWT_SECRET=your_secret
-GOOGLE_MAPS_API_KEY=your_key_here
-```
-
-**Never commit real passwords, JWT secrets or API keys to GitHub.**
-
-Typical local ports:
-
-```text
-Frontend  → localhost:3000
-Backend   → localhost:5000
-MySQL     → localhost:3306
-MongoDB   → localhost:27017
-```
-
-## 🧪 Testing
-
-Postman or Thunder Client can be used to test the REST API.
-
-Recommended test areas:
-
-- Registration and login
-- Donor CRUD
-- Blood-bank and inventory operations
-- Hospital requests
-- Blood availability queries
-- Donation/inventory updates
-- Invalid input handling
-- Authentication and authorization
-- Database query results
-
-## 📁 Intended Project Structure
-
-```text
-dropsync/
-├── database/       # SQL schema, seed data and queries
-├── backend/        # REST API and database connections
-├── frontend/       # Web UI, dashboards and map interface
-└── README.md       # Project documentation
-```
-
-> **Repository status:** SQL schema, seed data, and query examples are implemented under `database/`. Backend, frontend, and MongoDB integration remain planned.
-
-## 🔮 Future Scope
-
-- SMS/email alerts for urgent shortages
-- Donor eligibility reminders
-- Blood-bank admin dashboard
-- Real-time inventory updates
-- Advanced donor-request matching
-- Delivery-partner integration
-- Analytics dashboard for blood demand and availability
-
-## 🎓 Academic DBMS Focus
-
-DropSync connects DBMS concepts with a real-world emergency healthcare problem. The design demonstrates relational database modeling, primary/foreign keys, joins, indexing, transactions, aggregation and query optimization, while also introducing NoSQL storage for flexible operational data.
-
-The project follows the provided DBMS work map: **SQL for core relational records and MongoDB for flexible logs/request data.**
-
-## 👨‍💻 Project
-
-**DropSync — Blood Bank Database Management System**
-
-Academic project focused on **database design, SQL + NoSQL integration, location-based search and real-world problem solving**.
-
-## 📜 License
-
-This project is intended for academic and educational use. Add a project-specific open-source license if required.

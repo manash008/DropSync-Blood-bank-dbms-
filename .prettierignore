@@ -1,0 +1,4 @@
+# Keep the already merged Issue #3 presentation/data files in their authored style.
+frontend/index.html
+frontend/css/style.css
+frontend/js/mockData.js

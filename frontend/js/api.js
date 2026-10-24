@@ -1,107 +1,191 @@
 /**
- * DropSync API Client
- * Manages communication with Node.js/Express backend (Issue #2).
- * Automatically provides fallback to mock data when backend is not running,
- * explicitly tagging responses so the UI never misleads the user.
+ * API client that normalizes SQL results to the existing UI's display model.
+ * Live search failures are surfaced to the UI; sample inventory is available
+ * only through the explicit demo-mode toggle.
  */
-import { CONFIG } from './config.js';
-import { MOCK_BLOOD_BANKS, calculateDistanceKm } from './mockData.js';
+import { CONFIG } from "./config.js";
+import { MOCK_BLOOD_BANKS, calculateDistanceKm } from "./mockData.js";
 
-let activeMode = CONFIG.FORCE_MOCK ? 'mock' : 'live';
+let activeMode = CONFIG.FORCE_MOCK ? "mock" : "live";
 
 export function getActiveMode() {
   return activeMode;
 }
 
 export function setActiveMode(mode) {
-  if (mode === 'live' || mode === 'mock') {
+  if (mode === "live" || mode === "mock") {
     activeMode = mode;
   }
 }
 
-/**
- * Test connectivity with backend health endpoint
- */
 export async function checkBackendHealth() {
-  if (activeMode === 'mock') {
-    return { ok: false, mode: 'mock', reason: 'Mock mode forced in configuration.' };
+  if (activeMode === "mock") {
+    return { ok: false, mode: "mock", reason: "Sample-data mode is selected." };
   }
+
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000);
-    const res = await fetch(`${CONFIG.API_BASE_URL}/health`, { signal: controller.signal });
-    clearTimeout(timeoutId);
-    if (res.ok) {
-      return { ok: true, mode: 'live' };
-    }
-    return { ok: false, mode: 'mock', reason: `Backend returned status ${res.status}` };
-  } catch (err) {
-    return { ok: false, mode: 'mock', reason: 'Cannot reach backend at ' + CONFIG.API_BASE_URL };
+    const response = await fetch(CONFIG.API_BASE_URL + "/health");
+    if (response.ok) return { ok: true, mode: "live" };
+    return {
+      ok: false,
+      mode: "live",
+      reason: "Backend returned status " + response.status,
+    };
+  } catch {
+    return {
+      ok: false,
+      mode: "live",
+      reason: "Cannot reach backend at " + CONFIG.API_BASE_URL,
+    };
   }
 }
 
-/**
- * Search for blood banks matching blood group and location criteria.
- * @param {Object} params
- * @param {string} params.bloodGroup - Blood group code (e.g. 'O+', 'A-', or 'ALL')
- * @param {string} params.city - City name filter (e.g. 'Pune', 'Mumbai')
- * @param {number} [params.userLat] - Latitude of user (for proximity ranking)
- * @param {number} [params.userLng] - Longitude of user (for proximity ranking)
- * @param {boolean} [params.availableOnly] - Only return banks with > 0 units
- */
-export async function searchBloodAvailability(params) {
-  const { bloodGroup = 'O+', city = '', userLat = null, userLng = null, availableOnly = false } = params;
-
-  // Try live API if mode is live
-  if (activeMode === 'live') {
-    try {
-      const queryParams = new URLSearchParams();
-      if (bloodGroup && bloodGroup !== 'ALL') queryParams.append('blood_group', bloodGroup);
-      if (city) queryParams.append('city', city);
-      if (userLat != null && userLng != null) {
-        queryParams.append('lat', userLat);
-        queryParams.append('lng', userLng);
-      }
-      if (availableOnly) queryParams.append('available_only', 'true');
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
-      const res = await fetch(`${CONFIG.API_BASE_URL}/inventory/search?${queryParams.toString()}`, {
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-
-      if (res.ok) {
-        const json = await res.json();
-        return {
-          source: 'live',
-          isLive: true,
-          count: json.data ? json.data.length : 0,
-          results: json.data || [],
-          notice: 'Live data retrieved from DropSync backend.'
+function normalizeSqlResults(rows, bloodGroup, userLat, userLng) {
+  if (bloodGroup === "ALL") {
+    const banks = new Map();
+    for (const row of rows) {
+      const id = String(row.bloodBankId);
+      let bank = banks.get(id);
+      if (!bank) {
+        bank = {
+          blood_bank_id: id,
+          name: row.name,
+          address: row.address,
+          city: row.city,
+          phone: row.phone,
+          latitude: row.latitude,
+          longitude: row.longitude,
+          blood_group: "ALL",
+          units_available: 0,
+          full_inventory: {},
+          inventory_complete: false,
+          distance_km:
+            row.distanceKm ??
+            (userLat != null && userLng != null
+              ? calculateDistanceKm(
+                  userLat,
+                  userLng,
+                  row.latitude,
+                  row.longitude,
+                )
+              : null),
         };
+        banks.set(id, bank);
       }
-      console.warn('Backend returned error status, falling back to mock dataset.');
-    } catch (err) {
-      console.warn('Backend unavailable, falling back to mock dataset:', err.message);
+      bank.full_inventory[row.bloodGroup] = row.unitsAvailable;
+      bank.units_available += row.unitsAvailable;
     }
+    return [...banks.values()];
   }
 
-  // Mock data fallback
-  // Simulate network latency (250ms) for realistic UX verification
-  await new Promise((resolve) => setTimeout(resolve, 250));
+  return rows.map((row) => ({
+    blood_bank_id: String(row.bloodBankId),
+    name: row.name,
+    address: row.address,
+    city: row.city,
+    phone: row.phone,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    blood_group: row.bloodGroup,
+    units_available: row.unitsAvailable,
+    full_inventory: { [row.bloodGroup]: row.unitsAvailable },
+    inventory_complete: false,
+    distance_km:
+      row.distanceKm ??
+      (userLat != null && userLng != null
+        ? calculateDistanceKm(userLat, userLng, row.latitude, row.longitude)
+        : null),
+  }));
+}
 
-  let filtered = MOCK_BLOOD_BANKS.map((bank) => {
-    const units = bloodGroup === 'ALL'
-      ? Object.values(bank.inventory).reduce((a, b) => a + b, 0)
-      : (bank.inventory[bloodGroup] || 0);
+function sortResults(results, userLat, userLng) {
+  if (userLat != null && userLng != null) {
+    results.sort((left, right) => {
+      if (left.distance_km === null && right.distance_km === null) return 0;
+      if (left.distance_km === null) return 1;
+      if (right.distance_km === null) return -1;
+      return left.distance_km - right.distance_km;
+    });
+  } else {
+    results.sort((left, right) => right.units_available - left.units_available);
+  }
+  return results;
+}
 
-    const distance = (userLat != null && userLng != null)
-      ? calculateDistanceKm(userLat, userLng, bank.latitude, bank.longitude)
-      : null;
+async function searchLive({
+  bloodGroup,
+  city,
+  userLat,
+  userLng,
+  availableOnly,
+}) {
+  const query = new URLSearchParams({ bloodGroup });
+  if (city.trim()) query.set("city", city.trim());
+  if (userLat != null && userLng != null) {
+    query.set("lat", String(userLat));
+    query.set("lng", String(userLng));
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetch(
+      CONFIG.API_BASE_URL + "/blood-banks?" + query.toString(),
+      { signal: controller.signal },
+    );
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const fieldErrors = Object.values(payload.error?.fields || {}).join(" ");
+      const message =
+        [payload.error?.message, fieldErrors].filter(Boolean).join(" ") ||
+        "Blood-bank search failed (" + response.status + ").";
+      const error = new Error(message);
+      error.code = payload.error?.code || "SEARCH_FAILED";
+      throw error;
+    }
+
+    let results = normalizeSqlResults(
+      Array.isArray(payload.data) ? payload.data : [],
+      bloodGroup,
+      userLat,
+      userLng,
+    );
+    if (availableOnly) {
+      results = results.filter((bank) => bank.units_available > 0);
+    }
+    sortResults(results, userLat, userLng);
 
     return {
-      blood_bank_id: bank.blood_bank_id,
+      source: "live",
+      isLive: true,
+      count: results.length,
+      results,
+      notice: "Live inventory returned by the DropSync SQL API.",
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function searchSample({
+  bloodGroup,
+  city,
+  userLat,
+  userLng,
+  availableOnly,
+}) {
+  await new Promise((resolve) => setTimeout(resolve, 200));
+
+  let results = MOCK_BLOOD_BANKS.map((bank) => {
+    const units =
+      bloodGroup === "ALL"
+        ? Object.values(bank.inventory).reduce(
+            (total, value) => total + value,
+            0,
+          )
+        : bank.inventory[bloodGroup] || 0;
+    return {
+      blood_bank_id: String(bank.blood_bank_id),
       name: bank.name,
       address: bank.address,
       city: bank.city,
@@ -111,34 +195,47 @@ export async function searchBloodAvailability(params) {
       operating_hours: bank.operating_hours,
       blood_group: bloodGroup,
       units_available: units,
-      distance_km: distance,
-      full_inventory: bank.inventory
+      distance_km:
+        userLat != null && userLng != null
+          ? calculateDistanceKm(userLat, userLng, bank.latitude, bank.longitude)
+          : null,
+      full_inventory: bank.inventory,
+      inventory_complete: true,
     };
   });
 
-  // Filter by city if specified
-  if (city && city.trim() !== '') {
-    const cleanCity = city.trim().toLowerCase();
-    filtered = filtered.filter((b) => b.city.toLowerCase().includes(cleanCity));
+  if (city.trim()) {
+    const cityFilter = city.trim().toLowerCase();
+    results = results.filter((bank) =>
+      bank.city.toLowerCase().includes(cityFilter),
+    );
   }
-
-  // Filter by available units
   if (availableOnly) {
-    filtered = filtered.filter((b) => b.units_available > 0);
+    results = results.filter((bank) => bank.units_available > 0);
   }
-
-  // Sort: Distance (if user location provided), otherwise available units descending
-  if (userLat != null && userLng != null) {
-    filtered.sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
-  } else {
-    filtered.sort((a, b) => b.units_available - a.units_available);
-  }
+  sortResults(results, userLat, userLng);
 
   return {
-    source: 'mock',
+    source: "mock",
     isLive: false,
-    count: filtered.length,
-    results: filtered,
-    notice: 'Demo Mode: Displaying local simulated data (Node.js API Issue #2 not connected).'
+    count: results.length,
+    results,
+    notice: "Demo mode: displaying clearly labeled local sample inventory.",
   };
+}
+
+export function searchBloodAvailability(params) {
+  const {
+    bloodGroup = "O+",
+    city = "",
+    userLat = null,
+    userLng = null,
+    availableOnly = false,
+  } = params;
+
+  if (activeMode === "mock") {
+    return searchSample({ bloodGroup, city, userLat, userLng, availableOnly });
+  }
+
+  return searchLive({ bloodGroup, city, userLat, userLng, availableOnly });
 }
